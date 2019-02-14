@@ -1,6 +1,7 @@
-# Header
+# Welcome!
 
-This is the index page for this blog.
+This is the index page for this blog. The entries for each assignment will be
+listed below:
 
 ## Assignment 1
 
