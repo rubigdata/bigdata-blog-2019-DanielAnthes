@@ -77,7 +77,7 @@ To summarize, when the map reduce job is run the following things happen:
 ## Romeo or Juliet?
 
 In this section we will answer the question whether Romeo or Juliet is mentioned more often in Shakespeares work. To do so a single map reduce job is used.
-The mapper will split up the text into tokens of one word each, similarly to the other jobs discussed above. Subsequently, for each word the mapper will check whether the word is either Romeo or Juliet and emit a key, value pair, where the key is either Romeo or Juliet and the value is one.
+The mapper will split up the text into tokens of one word each, similarly to the other jobs discussed above. Subsequently, for each word the mapper will check whether the word is either Romeo or Juliet and emit a key, value pair, where the key is either Romeo or Juliet and the value is one. In this way, only one pass over the corpus is needed to count the occurrences of both names.
 
 ```
 public void map(Object key, Text value, Context context
@@ -96,9 +96,10 @@ public void map(Object key, Text value, Context context
     }
 ```
 
-The combiner and reducer remain unchainged from the Othello example. Now there are two different possible keys, so it is expected that the output will consist of two key, value pairs, where the keys are "Romeo" and "Juliet" and the values are the respective counts.
+The combiner and reducer remain unchanged from the Othello example. Now there are two different possible keys, so it is expected that the output will consist of two key, value pairs, where the keys are "Romeo" and "Juliet" and the values are the respective counts.
 
 ```
 Juliet  206
 Romeo   313
 ```
+
