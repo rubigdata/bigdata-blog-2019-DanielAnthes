@@ -28,7 +28,7 @@ The word count job used as an example in the previous section was taken from the
 A map-reduce job consists of several main components: the **mapper**,  **reducer** and optionally the **combiners**. 
 When executing the map-reduce job, first the mapper instances are applied to the data. Multiple mapper instances are executed on blocks of data (possibly on multiple data nodes) in parallel. All mapper instances operate on input given in the form of key, value pairs and produce intermediate key, value pairs as their output.
 
-In the case of the Othello Counter example (adopted from the WordCounter given as an example [here](https://hadoop.apache.org/docs/r2.9.2/hadoop-mapreduce-client/hadoop-mapreduce-client-core/MapReduceTutorial.html#Example:_WordCount_v1.0)) the mapper splits up the input text into words and then checks for each word, whether the word is "Othello". For each occurrence of the word, the mapper produces a key, value pair that holds "Othello" as its key and 1 as its value - representing one occurrence of "Othello". In a first attemt at creating this mapper, I simply checked whether each word equals "Othello" directly. However, since the input is split into words most occurrences of the target word are missed since different capitalizations and combinations such as "Othello." or "Othello," do not match. 
+In the case of the Othello Counter example (adopted from the WordCounter given as an example [here](https://hadoop.apache.org/docs/r2.9.2/hadoop-mapreduce-client/hadoop-mapreduce-client-core/MapReduceTutorial.html#Example:_WordCount_v1.0)) the mapper splits up the input text into words and then checks for each word whether the word is "Othello". For each occurrence of the word, the mapper produces a key, value pair that holds "Othello" as its key and 1 as its value - representing one occurrence of "Othello". In a first attempt at creating this mapper, I simply checked whether each word equals "Othello" directly. However, since the input is split into words most occurrences of the target word are missed since different capitalizations and combinations such as "Othello." or "Othello," do not match. 
 
 ```
 public void map(Object key, Text value, Context context
@@ -43,4 +43,62 @@ public void map(Object key, Text value, Context context
     }
 ```
 
+The intermediate key, value pairs are further processed by the reducers that in turn produce the final key, value pairs as their output. In this case the job of the reducer is very simple: it adds up the counts of all keys (of which in this case there is exactly one, "Othello"). The result is a set of final key, value pairs - in this case there will be exactly one pair, of which the value is the number of times "Othello" occurs in the corpus.
 
+```
+public static class IntSumReducer
+       extends Reducer<Text,IntWritable,Text,IntWritable> {
+    private IntWritable result = new IntWritable();
+
+    public void reduce(Text key, Iterable<IntWritable> values,
+                       Context context
+                       ) throws IOException, InterruptedException {
+      int sum = 0;
+      for (IntWritable val : values) {
+        sum += val.get();
+      }
+      result.set(sum);
+      context.write(key, result);
+    }
+  }
+```
+
+Since it is expensive to send many key value pairs from the mappers to the reducers, a combiner can be deployed. The combiners aggregate key, value pairs with the same key before the pairs are passed on to the reducers. Since the map reduce framework does not guarantee the execution ofthe combiners, they need to have the same input and output types. In this particular example the combiner is the same as the reducer.
+
+### Summary
+
+To summarize, when the map reduce job is run the following things happen:
+
+1. The mappers process the input data and emit intermediate key, value pairs. In this case all key value pairs have the following form < Othello, 1 > 
+2. (optional) The combiners combine key, value pairs with the same key for efficiency
+3. The intermediate key, value pairs are shuffeled to the reducers. Critically, a reducer receives all key value pairs with the same key.
+4. The reducer creates the final key, value pairs that make up the output of the job.
+
+## Romeo or Juliet?
+
+In this section we will answer the question whether Romeo or Juliet is mentioned more often in Shakespeares work. To do so a single map reduce job is used.
+The mapper will split up the text into tokens of one word each, similarly to the other jobs discussed above. Subsequently, for each word the mapper will check whether the word is either Romeo or Juliet and emit a key, value pair, where the key is either Romeo or Juliet and the value is one.
+
+```
+public void map(Object key, Text value, Context context
+                    ) throws IOException, InterruptedException {
+      StringTokenizer itr = new StringTokenizer(value.toString());
+      Text romeo = new Text("Romeo");
+      Text juliet = new Text("Juliet");
+
+      while (itr.hasMoreTokens()) {
+        word.set(itr.nextToken());
+        if(word.toString().toLowerCase().contains("romeo"))
+          context.write(romeo, one);
+        else if(word.toString().toLowerCase().contains("juliet"))
+          context.write(juliet, one);
+      }
+    }
+```
+
+The combiner and reducer remain unchainged from the Othello example. Now there are two different possible keys, so it is expected that the output will consist of two key, value pairs, where the keys are "Romeo" and "Juliet" and the values are the respective counts.
+
+```
+Juliet  206
+Romeo   313
+```
