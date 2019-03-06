@@ -8,3 +8,7 @@ listed below:
 For the first assignment this blog was created. A short summary can be found on
 the page below:
 [Link to the page created for assignment 1a](assignment1.md)
+
+## Assignment 2
+
+[Link to the first real blog entry for assignment 2](Assignment2.md)
