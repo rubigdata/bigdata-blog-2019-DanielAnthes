@@ -11,4 +11,6 @@ the page below:
 
 ## Assignment 2
 
+For the second Assignment, I wrote about simple Map-Reduce jobs that count the mentions of some of the characters in Shakespeares work. This blog post can be found here:
+
 [Link to the first real blog entry for assignment 2](Assignment2.md)
