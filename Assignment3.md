@@ -1,6 +1,6 @@
 # Assignment 3
 
-In this blog post I describe my first experience with using Spark SQL. In the following I will describe the steps I took to analyze a dataset published by the city council of Nijmegen  [here](https://www.nijmegen.nl/opendata/BAG_ADRES.csv). To start off I will answer some of the questions posed in the notebook for this assignment and subsequently will look into the data further. In the process I will comment on how to use Spark to perform the analysis.
+In this blog post I describe my first experience with using Spark SQL. In the following I will describe the steps I took to analyze a dataset published by the city council of Nijmegen  [here](https://www.nijmegen.nl/opendata/BAG_ADRES.csv). To start off I will answer some of the questions posed in the notebook for this assignment and subsequently will look into the data further. In the process I will comment on how to use Spark to perform the analysis. Since this blog post is written in markdown it seemed impractical to copy and format all the outputs to the various commands in this post. To see all the steps I took in the analysis and to inspect the data it is probably easiest to have a look at the notebook uploaded [here](https://github.com/rubigdata/spark-2019-DanielAnthes/blob/master/assignment3_danielanthes.snb.ipynb)
 
 ## Reading in a dataset
 
