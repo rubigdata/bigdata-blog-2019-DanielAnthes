@@ -53,7 +53,8 @@ Now we can perform SQL queries on the two views:
 
 `spark.sql("FROM quarter_names SELECT quarter WHERE quarter NOT IN (SELECT quarter FROM kosquarter)")`
 
-This query results in a list of quarters with no associated art pieces:  
+This query first selects all quarter names from the table 'kosquarter' and then uses them to select all quarters from the 'quarter_names' table that do not appear in this list. This results in a list of quarters with no associated art pieces:  
+
 "Malvert"  
 "Kwakkenberg"  
 "Aldenhof"  
@@ -137,12 +138,14 @@ This query yields statistics about the dataset. Looking at the results shows tha
 
 Further problems are revealed when looking at the counts per quarter. To add up all counts of inhabitants per quarter I used the following SQL query:
 
-pop_cleaned.createOrReplaceTempView("pop_stats")
-spark.sql("SELECT SUM(count) AS count, quarter FROM pop_stats GROUP BY quarter")
+`pop_cleaned.createOrReplaceTempView("pop_stats")`  
+`spark.sql("SELECT SUM(count) AS count, quarter FROM pop_stats GROUP BY quarter")`
+
+This query groups the entries in our population statistics table by the quarter column and sums up all the population counts per group (i.e. per quarter).
 
 According to this query 'Nijmegen-Midden' has 5311989 inhabitants and there are entries for Groningen, Oss and Eindhoven - clearly not relevant to the analysis.
 
-I fixed the second problem first by revisting the quarter_names dataframe introduced earlier in this blog post. Since it contains all relevant quarters of Nijmegen it can be used to filter the new dataset:
+I first adressed the second problem by revisting the quarter_names dataframe introduced earlier in this blog post. Since it contains all relevant quarters of Nijmegen it can be used to filter the new dataset:
 
 `spark.sql("SELECT SUM(count),quarter FROM pop_stats WHERE quarter IN (SELECT quarter FROM quarter_names) GROUP BY quarter")`
 
