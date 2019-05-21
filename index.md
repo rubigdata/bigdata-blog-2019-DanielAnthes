@@ -7,10 +7,16 @@ listed below:
 
 For the first assignment this blog was created. A short summary can be found on
 the page below:
-[Link to the page created for assignment 1a](assignment1.md)
+[Link to the page created for assignment 1a](Assignment1.md)
 
 ## Assignment 2
 
-For the second Assignment, I wrote about simple Map-Reduce jobs that count the mentions of some of the characters in Shakespeares work. This blog post can be found here:
+For the second assignment, I wrote about simple Map-Reduce jobs that count the mentions of some of the characters in Shakespeares work. This blog post can be found here:
 
 [Link to the first real blog entry for assignment 2](Assignment2.md)
+
+## Assignment 3
+
+For the third assignment I wrote about my experience with using Spark to analyse data provided by the municipality of Nijmegen about Nijmegen's art and population. The blog post can be found here:
+
+[Population and Art in Nijmegen](Assignment3.md)
