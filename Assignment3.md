@@ -98,6 +98,8 @@ To further explore the open data I set out to determine which quarter of Nijmege
 `population_stats.printSchema()`  
 `population_stats.show(10)`  
 
+### Inspecting the Data
+
 On first inspection the data seems quite messy. There are no column headers, some columns include multiple values and others contain different variable names. After looking at some rows of data it seems that the 4th column indicates what kind of information is stored in the row. We can list all of the possible values of that column using:
 
 `population_stats.select("_c3").distinct()`  
@@ -122,6 +124,8 @@ This yields a new table with 4 columns:
 * 'measure' the type of measurement (either absolute or estimated numbers)
 * 'gender_age' a column containing an age range and gender
 * 'quarter'
+
+### Cleaning the Data
 
 Now that all irrelevant information is removed the data still needs to be cleaned up to be usable. For example the counts are still saved as strings and the column gender_age contains two values that should best be split into two separate columns. This can be fixed by running the following command:
 
@@ -163,20 +167,22 @@ To see which quarter is missing I ran the following query:
 
 `spark.sql("SELECT quarter FROM quarter_names WHERE quarter NOT IN (SELECT DISTINCT quarter from pop_stats WHERE quarter IN (SELECT quarter FROM quarter_names))")`
 
+In this query, first all quarters of Nijmegen are selected (they are all listed in the quarter_names table). Then, as above all quarters from the pop_stats table are selected, if they are quarters of Nijmegen (i.e. they are in the list of quarters we just selected from quarter_names). Finally, the selection is 'inverted' by selecting all those quarters of Nijmegen that are not in the list of quarters we just created. We are left with only one result - the quarter that is present in the quarter_names table, but not in the pop_stats table.
+
 Turns out there is a good reason for the missing quarter: The 44th quarter that was missing is called 'Haven- en industrieterrein' explaining why there is no population data.
 
-To look into fixing the population counts I first created a new dataset only containing those quarters present in quarter_names:
+Now that we know how to filter out only the relevant quarters for our analysis we can create a new dataset that only includes the relevant entries. To do this I used Spark's dataset API:
 
 `val pc_nijmegen = pop_cleaned.where("quarter IN (SELECT quarter FROM quarter_names)")`
 
-Next I turned my attention to the other problem discovered: both the gender and the age columns contain values that seem to be artifacts. After listing all values for both columns with the two queries below I decided to try and get approximately correct data by restricting the values in the 'gender' column to 'man' and 'vrouw' and to restrict the values in the age column to those that start with a number.
+Next I turned my attention to the other problem discovered: both the gender and the age columns contain values that seem to be artifacts. After listing all values for both columns with the two queries below I decided to try and get approximately correct data by restricting the values in the 'gender' column to 'man', 'vrouw' and 'onbekend' and to restrict the values in the age column to those that start with a number.
 
 `spark.sql("SELECT DISTINCT gender FROM pc_nij")`  
 `spark.sql("SELECT DISTINCT age FROM pc_nij")`
 
 To do so I used a spark's filter function on my dataframe:
 
-`val pc_nij_cleaned = pc_nijmegen.filter($"age" rlike "[0-9].*").filter($"gender" isin ("man", "vrouw"))`
+`val pc_nij_cleaned = pc_nijmegen.filter($"age" rlike "[0-9].*").filter($"gender" isin ("man", "vrouw", "onbekend"))`
 
 However, adding up all counts in this dataset still implies that Nijmegen has over 7 million inhabitants - so clearly there are still entries in the dataset that need to be cleaned up:
 
@@ -187,4 +193,39 @@ Running another query revealed that the data contained overlapping age ranges an
 
 `spark.sql("SELECT count, gender, age FROM inhabitants WHERE quarter == 'Tolhuis' ORDER BY gender")`
 
-The above query returns rows with age ranges such as "25-49" but als "25-29". There also exist multiple entries for the same age range.
+The above query returns rows with age ranges such as "25-49" but also "25-29". There also exist multiple entries for the same age range.
+
+### Finally, clean data
+
+To keep this blog post from getting too long I won't list all the individual steps I took to arrive at the final population dataset. The final population dataset is made up of just two columns:
+
+* quarter - with the name of the 43 quarters of Nijmegen for which we have population dataset
+* count - the number of inhabitants per quarter
+
+Summing the total number of inhabitants in all 43 quarters shows a total population of 221664 inhabitants which comes reasonably close to the population count given on [wikipedia](https://en.wikipedia.org/wiki/Nijmegen) (287,517 (metropolitan area)).
+
+### Joining the Datasets
+
+Now That both the art and population data is ready, the datasets need to be joined together. I did this using SQL, but the same result can also be achieved using spark's `join` function on datasets. The function `toDF` saves the output of the SQL query as a new dataframe:
+
+`val art_inhabitants = spark.sql("SELECT I.quarter, count as inhabitants,num_art FROM inhabitants_quarter I JOIN (SELECT quarter, COUNT(naam) as num_art FROM kosquarter GROUP BY quarter) K ON I.quarter == K.quarter").toDF()`
+
+The above statement performs the join on the 'quarter' column of the two dataframes. The result is a dataframe with 18 rows - one for each quarter that has art.
+Now that all the data is neatly collected in one dataframe we can finally compute which quarter has the most art per inhabitant.
+
+### Which quarter has the highest density of art per inhabitant?
+
+To show which quarter has the highest density of art I computed the number of inhabitants in a quarter by the number of art pieces:
+
+`val art_density = art_inhabitants.withColumn( "art_density", art_inhabitants("inhabitants") / art_inhabitants("num_art"))
+art_density.show()`
+
+The above command performs the calculation and saves the result as a new column named "art_density". Now, the dataframe contains the final result. We can show the "top 5 most artsy quarters of Nijmegen" by ordering the data in ascending order on the art_density column:
+
+art_density.orderBy(asc("art_density")).show(5)
+
+1. Benedenstad
+2. Stadscentrum     
+3. Heijendaal    
+4. Bottendaal    
+5. Altrade  
