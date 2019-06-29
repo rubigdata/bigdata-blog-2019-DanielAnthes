@@ -20,3 +20,11 @@ For the second assignment, I wrote about simple Map-Reduce jobs that count the m
 For the third assignment I wrote about my experience with using Spark to analyse data provided by the municipality of Nijmegen about Nijmegen's art and population. The blog post can be found here:
 
 [Population and Art in Nijmegen](Assignment3.md)
+
+## Final Assignment
+
+For the Final Assignment I analyze data from Twitter taken from the CommonCrawl. The blog post is linked below:
+
+[Twitter and the CommonCrawl](FinalAssignment.md)
+
+
