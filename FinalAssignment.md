@@ -24,7 +24,7 @@ When doing so it immediately becomes clear that not all entries will be interest
 spark.sql("SELECT length, status, url FROM tidx WHERE status == '200' AND NOT url LIKE '%robots.txt%'"))
 ```
 
-After the above steps 573 WARC files remain. To access the WARC files in my program the only field that I need is the one containing the name and location of the WARC file. Therefore I create an RDD containing only this information and the URL and subsequently use the RDD to import the data. To create a valid link to the WARC file the address of CommonCrawl neds to be prepended to the location of the WARC file on their server:
+After the above steps 573 WARC files remain. To access the WARC files in my program the only field that I need is the one containing the name and location of the WARC file. Therefore I create an RDD containing only this information and the URL and subsequently use the RDD to import the data. To create a valid link to the WARC file the address of CommonCrawl needs to be prepended to the location of the WARC file on their server:
 
 ```scala
 val WARC_locs = spark.sql("SELECT filename, url FROM tidx WHERE status == '200' AND NOT url LIKE '%robots.txt%'").rdd
@@ -73,7 +73,7 @@ val twitter = twitter_responses.filter(x => x._2.header.warcTargetUriStr.contain
 ```
 ## Getting Usernames inlcuded in the Sample
 
-Conveniently, URLs on Twitter's domain seem to have a fairly consistent format that includes the username the current page is associated with. URLs in the sample I collected had the shape: www.twitter.com/USERNAME (or /@USERNAME). Sometimes the username is followed by more text, for example if the link points to a list (e.g.: https://twitter.com/obamauni/lists/damohub-com). To extract the username only, I wrote a helper function to first removed the leading part of the URL and then extract the username from the rest by removing the '@' and trailing part of the URL if present:
+Conveniently, URLs on Twitter's domain seem to have a fairly consistent format that includes the username the current page is associated with. URLs in the sample I collected had the shape: www.twitter.com/USERNAME (or /@USERNAME). Sometimes the username is followed by more text, for example if the link points to a list (e.g.: https://twitter.com/obamauni/lists/damohub-com). To extract the username only, I wrote a helper function to first remove the leading part of the URL and then extract the username from the rest by removing the '@' and trailing part of the URL if present:
 
 ```scala
 def getUsername(url : String):String = {
@@ -168,6 +168,144 @@ object TwitterUsernameApp {
 }
 ```
 
+Running this app gave the following output:
+
+```
+Number of user names: 46
+*** USER NAMES ***
+jeroenvaninkel
+om
+Hexxeh
+iciradio87
+gerardekdom
+Wnicholasgomes
+dnupdate
+photomarathonuk
+...
+```
+## Extracting hashtags
+
+Next, I tried to build on this basic program by extracting all hashtags used in my twitter data sample. To do so I built the following app:
+
+```scala
+package org.rubigdata
+import nl.surfsara.warcutils.WarcInputFormat
+import org.jwat.warc.{WarcConstants, WarcRecord}
+import org.apache.hadoop.io.LongWritable;
+import org.apache.commons.lang.StringUtils;
+import org.apache.spark.sql.SparkSession
+import java.io.InputStreamReader;
+import java.io.IOException;
+import org.jsoup.Jsoup;
+import scalaz._
+import Scalaz._
+
+object TwitterHastagApp {
+  def main(args: Array[String]) {
+    val data_path = "file:///app/sample"
+    val spark = SparkSession.builder.appName("TwitterHastagApp").getOrCreate()
+    val sc = spark.sparkContext
+
+    val warc_objs = sc.newAPIHadoopFile(
+              data_path,
+              classOf[WarcInputFormat],               // InputFormat
+              classOf[LongWritable],                  // Key
+              classOf[WarcRecord]                     // Value
+    )
+
+    val twitter_contents = warc_objs.filter(_._2.hasPayload()).
+                                        filter(x => x._2.header.warcTypeIdx == 2).
+                                        map{wr => (wr._2.header.warcTargetUriStr,getContent(wr._2))}
+
+    val twittertxt = twitter_contents
+                      .filter(x => x._1 contains "twitter")
+                      .filter(x => !(x._1 contains "robots.txt"))
+                      .map(x => (x._1, HTML2Txt(x._2)))  
+
+    val twitter_tkns = twittertxt.map(x => (x._1, getUsername(x._1), x._2.split(" ")))
+
+    val hashtags = twitter_tkns.map(x => (x._1, x._2, x._3.filter(_.startsWith("#"))))
+
+    val counts = hashtags.map(x => x._3.groupBy(identity).mapValues(_.length))
+
+    val hashtag_counts = counts.reduce((a,b) => a |+| b)
+    val output = hashtag_counts.toSeq.sortWith(_._2 > _._2)
+
+    for(e <- output){ println(e._1 + ": " + e._2) }
+
+    spark.stop()
+  }
+  def HTML2Txt(content: String) = {
+    try {
+      Jsoup.parse(content).body().text()
+    }
+    catch {
+      case e: Exception => throw new IOException("Caught exception processing input row ", e)
+    }
+  }
+
+  def getContent(record: WarcRecord):String = {
+    val cLen = record.header.contentLength.toInt
+    //val cStream = record.getPayload.getInputStreamComplete()
+    val cStream = record.getPayload.getInputStream()
+    val content = new java.io.ByteArrayOutputStream();
+
+    val buf = new Array[Byte](cLen)
+
+    var nRead = cStream.read(buf)
+    while (nRead != -1) {
+      content.write(buf, 0, nRead)
+      nRead = cStream.read(buf)
+    }
+
+    cStream.close()
+
+    val contentString = content.toString("UTF-8")
+    return contentString
+  }
+
+  def getUsername(url : String):String = {
+    //remove first part of URL
+    val ending = url.substring(20)
+    //split on slashes
+    val split_ending = ending.split("/")
+    //if username is preceded by @, remove it
+    if(split_ending(0).charAt(0) == '@')
+      return split_ending(0).substring(1)
+    else
+      return split_ending(0)
+  }
+
+}
+```
+
+Unfortunately, this app did not run on the provided cluster, but instead gave the following error message that I was not able to fix:
+
+```
+19/06/30 17:10:12 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+log4j:WARN No appenders could be found for logger (org.apache.spark.deploy.SparkSubmit$$anon$2).
+log4j:WARN Please initialize the log4j system properly.
+log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+
+```
+
+However, the code did run fine in my Spark notebook, which can be found [here](https://github.com/rubigdata/cc-2019-DanielAnthes/blob/master/Twitter%20Analysis.snb.ipynb)
+
+Below are the 10 most common hashtags along with their counts that were found in the sample:
+
+```scala
+(#per?nurkka??@teamperanurkka,20),
+ (#success,14),
+ (#entrepreneur,11),
+ (#T20Japan,7),
+ (#LloydsBankAcademy,5),
+ (#unboxing,5),
+ (#digitalskills,5),
+ (#GoHoos,4),
+ (#art,4),
+ (#artwork,4)
+```
+
 ## What I Learned
 
 ### How Big is Big Data
@@ -177,3 +315,12 @@ Even though the WARC files that were returned by my query to the CommonCrawl dat
 ### Unstructured Data is full of Surprises
 
 Even a simple task such as parsing a URL to find usernames can be difficult if the exact format of the data is not known. Originally I thought it would be easy to correctly parse all URLs, but there were many unexpected edge cases that lead to parsing errors.
+
+### Unstructured Data can lead to Unexpected Problems
+
+As a follow up to parsing all usernames out of my Twitter sample I tried to extract the html contents. Even though this had worked before on a small test crawl I created myself using wget, I could not get it to work on the Twitter dataset extracted from the CommonCrawl at first. This may have been an easy to diagnose problem if I had only been working on a small amount of data in a simple program, but without a straightforward way to look at a single object in Spark for debugging, I spent quite some time trying to find out where the issue lies.
+
+### Working with 'BigData' is difficult
+
+Even though the programs presented in this blog post are very simple it took a long time to get them to work (and some parts still don't...). Most steps along the way took much longer than expected and problems occurred in unexpected places. It took a long time to even get data to work on out of the CommonCrawl and most of the time working on this assignment was spent trying to fix seemingly random exceptions that started appearing as soon as I started working on a larger sample from the CommonCrawl instead of a very small crawl of the BBC twitter account I created myself for testing.  
+Further, I expected that it would be straightforward to create a standalone app out of my analysis in a spark notebook. This was not the case and I ended up spending quite some time on trying to compile my programs.
